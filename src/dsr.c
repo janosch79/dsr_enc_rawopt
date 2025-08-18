@@ -18,7 +18,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-#include "bits.h"
 #include "dsr.h"
 
 static const uint16_t _ileave[256] = {
@@ -148,6 +147,41 @@ static const uint8_t _zi_bch[64] = {
 	0x53,0x82,0x20,0xF1,0xB5,0x64,0xC6,0x17,
 };
 
+
+int bits_write_uint(uint8_t *b, int x, uint64_t bits, int nbits)
+{
+	uint64_t m = UINT64_MAX >> (64 - nbits);
+	int s;
+	
+	/* Zero unwanted bits */
+	bits &= m;
+	
+	/* Move pointer ahead to first affected byte */
+	b += x >> 3;
+	
+	for(s = nbits - (8 - (x & 7)); s >= 0; s -= 8, b++)
+	{
+		*b &= ~(m >> s);
+		*b |= bits >> s;
+	}
+	
+	if(s < 0)
+	{
+		s = -s;
+		*b &= ~(m << s);
+		*b |= bits << s;
+	}
+	
+	return(x + nbits);
+}
+
+int bits_write_int(uint8_t *b, int x, int64_t bits, int nbits)
+{
+	return(bits_write_uint(b, x, (uint64_t) bits, nbits));
+}
+
+
+
 static uint32_t _utf8next(const char *str, const char **next)
 {
 	const uint8_t *c;
@@ -254,7 +288,18 @@ static void _ziframe(uint8_t *b, uint8_t sc_l, uint8_t sc_r, uint32_t pi)
 	bits_write_int(b, 28,  c, 14);
 	bits_write_int(b, 42, pi, 22);
 }
+/* 
 
+static uint16_t get_bits_msb(const uint8_t *b, int start, int n)
+{
+    	uint16_t v = 0;
+    	for (int i = 0; i < n; i++) {
+        int bit = start + i;
+        v = (v << 1) | ((b[bit >> 3] >> (7 - (bit & 7))) & 1);
+    	}
+    		return v;
+}
+ */
 extern void dsr_encode(dsr_t *s, uint8_t *block, const int16_t *audio)
 {
 	int i, j, x;
@@ -332,6 +377,13 @@ extern void dsr_encode(dsr_t *s, uint8_t *block, const int16_t *audio)
 			c[j][9] >>= 3;
 		}
 		
+		/* if (i == 0) {
+    	uint16_t a_sync = get_bits_msb(a, 0, 11);
+    	uint16_t b_sync = get_bits_msb(b, 0, 11);
+    	fprintf(stderr, "ENC A sync = 0x%03x, B sync = 0x%03x\n", a_sync, b_sync);
+		} */
+	
+
 		/* Insert the 77-bit blocks into the frames, 2x interleaved */
 		for(x = j = 0; j < 10; j++)
 		{

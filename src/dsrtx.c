@@ -181,7 +181,8 @@ const int _load_config(dsrtx_t *s, const char *filename)
 	else if(strcmp(v, "int16") == 0)  s->data_type = RF_INT16;
 	else if(strcmp(v, "int32") == 0)  s->data_type = RF_INT32;
 	else if(strcmp(v, "float") == 0)  s->data_type = RF_FLOAT;
-	else if(strcmp(v, "") == 0)       s->data_type = -1;
+	else if(strcmp(v, "unmod_uint8") == 0) s->data_type = RF_UNMOD_UINT8;
+	else if(strcmp(v, "unmod_udp") == 0)   s->data_type = RF_UNMOD_UDP;
 	else
 	{
 		fprintf(stderr, "Error: Invalid data type '%s'.\n", v);
@@ -295,12 +296,21 @@ static int testrun(dsrtx_t *s)
 		
 		/* Encode the next audio block (2ms) */
 		dsr_encode(&s->dsr, block, audio);
+
 		
-		/* New version */
-		l = rf_qpsk_modulate(&s->qpsk, o2, block, 40960);
-		rf_write(&s->rf, o2, l);
-	}
-	
+		/* New version with raw stream and raw_udp_stream */		
+		if ((s->data_type == RF_UNMOD_UINT8 && strcmp(s->output_type, "file") == 0)||(s->data_type == RF_UNMOD_UDP && strcmp(s->output_type, "file") == 0)) 
+		{
+			/* block = 40960 Bits = 5120 Bytes; 1:1 push out */
+			rf_write(&s->rf, (int16_t*)block, 40960/8);  /* <-- 5120 */
+		} 
+		else 
+		{
+			l = rf_qpsk_modulate(&s->qpsk, o2, block, 40960);
+			rf_write(&s->rf, o2, l);
+		}
+
+}	
 	return(0);
 }
 
@@ -406,22 +416,22 @@ int main(int argc, char *argv[])
 	signal(SIGABRT, &_sigint_callback_handler);
 	
 	/* Start the radio */
-	if(strcmp(s.output_type, "file") == 0)
-	{
-		if(rf_file_open(&s.rf, s.output, s.data_type) != 0)
-		{
-			return(-1);
-		}
-	}
-#ifdef HAVE_HACKRF
-	else if(strcmp(s.output_type, "hackrf") == 0)
+	if(strcmp(s.output_type, "hackrf") == 0)
 	{
 		if(rf_hackrf_open(&s.rf, s.output, s.sample_rate, s.frequency, s.gain, s.amp) != 0)
 		{
+			//vid_free(&s.vid);
 			return(-1);
 		}
 	}
-#endif
+	else if(strcmp(s.output_type, "file") == 0)
+	{
+		if(rf_file_open(&s.rf, s.output, s.data_type) != 0)
+		{
+			//vid_free(&s.vid);
+			return(-1);
+		}
+	}
 #ifdef HAVE_SOAPYSDR
 	else if(strcmp(s.output_type, "soapysdr") == 0)
 	{
@@ -431,11 +441,6 @@ int main(int argc, char *argv[])
 		}
 	}
 #endif
-	else
-	{
-		fprintf(stderr, "Unrecognised output type: %s\n", s.output_type);
-		return(-1);
-	}
 	
 	/* Initalise the modem */
 	rf_qpsk_init(&s.qpsk, s.sample_rate / DSR_SYMBOL_RATE, 0.8 * rf_scale(&s.rf));

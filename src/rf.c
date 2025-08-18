@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <math.h>
 #include "rf.h"
 
@@ -40,6 +41,7 @@ int rf_write(rf_t *s, int16_t *iq_data, int samples)
 	}
 	
 	return(-1);
+
 }
 
 int rf_close(rf_t *s)
@@ -99,7 +101,7 @@ int rf_qpsk_init(rf_qpsk_t *s, int interpolation, double level)
 	const double sym[4][2] = { { -1, -1 }, { -1, 1 }, { 1, 1 }, { 1, -1 } };
 	int i, x, n;
 	double r, t;
-	
+	fprintf(stderr, "MODULATOR INIT: Interpolation = %d, Level = %f\n", interpolation, level);
 	memset(s, 0, sizeof(rf_qpsk_t));
 	
 	/* Generate the symbol shape */
@@ -147,6 +149,22 @@ int rf_qpsk_modulate(rf_qpsk_t *s, int16_t *dst, const uint8_t *src, int bits)
 	int16_t *win;
 	int x, i;
 	
+// Innerhalb der rf_qpsk_modulate Funktion, wo die static int once = 0; Logik ist:
+static int once = 0;
+if (!once) {
+    int nbytes = bits / 8;
+    int dump = nbytes < 256 ? nbytes : 256; // show first up to 128 bytes
+    fprintf(stderr, "MOD SRC (first %d bytes):", dump);
+    for (int i = 0; i < dump; i++) {
+        fprintf(stderr, " %02X", src[i]);
+    }
+    fprintf(stderr, "\n");
+    
+    fprintf(stderr, "MODULATOR INFO: Initial s->sym = %d, s->interpolation = %d\n", s->sym, s->interpolation);
+    
+    once = 1;
+}
+    
 	for(x = 0; x < bits; x += 2)
 	{
 		/* Read out the next 2-bit symbol, MSB first */

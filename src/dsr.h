@@ -41,12 +41,15 @@ typedef struct {
 	
 } dsr_t;
 
+extern int bits_write_uint(uint8_t *b, int x, uint64_t bits, int nbits);
+extern int bits_write_int(uint8_t *b, int x, int64_t bits, int nbits);
 extern void dsr_frames(dsr_t *s, uint8_t *a, uint8_t *b);
 extern void dsr_encode(dsr_t *s, uint8_t *block, const int16_t *audio);
 extern void dsr_encode_ps(uint8_t *dst, const char *src);
 extern void dsr_decode_ps(char *dst, const uint8_t *src);
 extern void dsr_update_sa(dsr_t *s);
 extern void dsr_init(dsr_t *s);
+
 
 #endif
 
