@@ -22,6 +22,22 @@
 #include "rf.h"
 
 
+#ifndef COLOR_AMBER
+#define COLOR_AMBER "\x1b[33m"
+#endif
+#ifndef COLOR_BLUE
+#define COLOR_BLUE  "\x1b[34m"
+#endif
+#ifndef COLOR_RESET
+#define COLOR_RESET "\x1b[0m"
+#endif
+
+
+#ifndef UDP_PREVIEW_BYTES
+#define UDP_PREVIEW_BYTES 2048
+#endif
+
+
 /* File sink */
 typedef struct {
 	FILE *f;
@@ -317,6 +333,7 @@ static int _rf_file_write_float(void *private, int16_t *iq_data, int samples)
 }
 
 
+
 static int _rf_file_write_unmod_uint8(void *private, int16_t *iq_data, int bytes)
 {
     rf_file_t *rf = private;
@@ -370,7 +387,32 @@ static int _rf_file_close(void *private)
 }
 
 
+
 // ---- Writer: unmodulierte Bytes -> UDP ------------------------------------
+
+
+static inline void rf_udp_refill_tokens(rf_udp_t *u)
+{
+    if (!u || u->bitrate_bps == 0) return;
+
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+
+    long long dt_ns = (long long)(now.tv_sec - u->last.tv_sec) * 1000000000LL
+                    + (long long)(now.tv_nsec - u->last.tv_nsec);
+    if (dt_ns <= 0) return;
+
+    double add_bytes = ((double)u->bitrate_bps / 8.0) * ((double)dt_ns / 1e9);
+    u->tokens_bytes += add_bytes;
+
+    /* Bucket-Cap (z. B. 8x payload) */
+    double cap = (double)(u->payload * 8u);
+    if (u->tokens_bytes > cap) u->tokens_bytes = cap;
+
+    u->last = now;
+}
+
+
 
 static int _rf_udp_write_unmod_uint8(void *private, int16_t *iq_data, int bytes)
 {
@@ -381,19 +423,23 @@ static int _rf_udp_write_unmod_uint8(void *private, int16_t *iq_data, int bytes)
     size_t total = (size_t)bytes;
     size_t off = 0;
 
-    // (Einmalige) farbige Vorschau ohne "0x", A9 59 highlighten
+    /* einmalige Vorschau (A9 59 highlight) */
     if (!u->preview_done) {
+        
         size_t show = total < UDP_PREVIEW_BYTES ? total : UDP_PREVIEW_BYTES;
         printf("UDP: Sende %zu unvermodulierte Roh-Bytes (Hex, ohne 0x):\n", show);
 
         size_t count = 0;
         for (size_t k = 0; k < show; ) {
             if (k + 1 < show && p[k] == 0xA9 && p[k+1] == 0x59) {
-                printf(COLOR_AMBER "%02X" COLOR_RESET " ", p[k]);   count++; if ((count % 16) == 0) printf("\n");
-                printf(COLOR_BLUE  "%02X" COLOR_RESET " ", p[k+1]); count++; if ((count % 16) == 0) printf("\n");
+                printf(COLOR_AMBER "%02X" COLOR_RESET " ", p[k]);
+                if ((++count % 16) == 0) printf("\n");
+                printf(COLOR_BLUE  "%02X" COLOR_RESET " ", p[k+1]);
+                if ((++count % 16) == 0) printf("\n");
                 k += 2;
             } else {
-                printf("%02X ", p[k]); count++; if ((count % 16) == 0) printf("\n");
+                printf("%02X ", p[k]);
+                if ((++count % 16) == 0) printf("\n");
                 k += 1;
             }
         }
@@ -401,14 +447,31 @@ static int _rf_udp_write_unmod_uint8(void *private, int16_t *iq_data, int bytes)
         u->preview_done = 1;
     }
 
-    // Chunking in UDP-Pakete
     while (off < total) {
         size_t chunk = total - off;
         if (chunk > u->payload) chunk = u->payload;
 
+        /* Pacing: warten bis genug Tokens (Bytes) vorhanden */
+        if (u->bitrate_bps) {
+            for (;;) {
+                rf_udp_refill_tokens(u);
+                if (u->tokens_bytes >= (double)chunk) break;
+
+                double need_bytes = (double)chunk - u->tokens_bytes;
+                double need_ns = (need_bytes * 8.0 * 1e9) / (double)u->bitrate_bps;
+                if (need_ns < 100000.0) need_ns = 100000.0; /* min 0.1 ms */
+
+                struct timespec ts;
+                ts.tv_sec  = (time_t)(need_ns / 1e9);
+                ts.tv_nsec = (long)(need_ns - (double)ts.tv_sec * 1e9);
+                nanosleep(&ts, NULL);
+            }
+            u->tokens_bytes -= (double)chunk;
+        }
+
         ssize_t sent = send(u->sock, p + off, chunk, 0);
         if (sent < 0) {
-            fprintf(stderr, "UDP send() failed: %s\n", strerror(errno));
+            // fprintf(stderr, "UDP send() failed: %s\n", strerror(errno));
             return -1;
         }
         off += (size_t)sent;
@@ -416,6 +479,7 @@ static int _rf_udp_write_unmod_uint8(void *private, int16_t *iq_data, int bytes)
 
     return 0;
 }
+
 
 
 // Hilfsparser für "udp://host:port", "host:port" oder "[ipv6]:port"
@@ -474,6 +538,11 @@ int rf_file_open(rf_t *s, const char *filename, int type)
             fprintf(stderr, "RF_UNMOD_UDP: Konnte UDP %s:%s nicht oeffnen.\n", host, port);
             return -1;
         }
+        else{
+            rf_udp_set_bitrate(udp_priv, 20480000ULL); // ~10 Mb/s
+            }
+           
+        
 
         s->private = udp_priv;
         s->write   = _rf_udp_write_unmod_uint8;
