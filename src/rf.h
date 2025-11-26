@@ -39,7 +39,7 @@
 #define RF_UNMOD_UINT8 6
 #define RF_UNMOD_UDP 7  
 
-// Gemeinsame Farb-Strings bitte oberhalb einmal definieren, wenn mehrfach genutzt:
+// Common color strings - define once above if used multiple times:
 #define COLOR_AMBER "\x1b[38;5;214m"
 #define COLOR_BLUE  "\x1b[34m"
 #define COLOR_RESET "\x1b[0m"

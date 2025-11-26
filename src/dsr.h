@@ -50,6 +50,12 @@ extern void dsr_decode_ps(char *dst, const uint8_t *src);
 extern void dsr_update_sa(dsr_t *s);
 extern void dsr_init(dsr_t *s);
 
+#ifdef DSR_ENABLE_TEST
+/* Lookup tables (for testing/debugging) */
+extern const uint16_t _ileave[256];
+extern const uint8_t _par[256];
+#endif
+
 
 #endif
 

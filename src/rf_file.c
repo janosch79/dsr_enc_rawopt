@@ -1,4 +1,4 @@
-/* dsr - Digitale Satelliten Radio (DSR) encoder                         */
+/* dsr - Digital Satellite Radio (DSR) encoder                          */
 /*=======================================================================*/
 /* Copyright 2021 Philip Heron <phil@sanslogic.co.uk>                    */
 /*                                                                       */
@@ -39,7 +39,7 @@ static int _rf_file_write_uint8(void *private, int16_t *iq_data, int samples)
     uint8_t *u8 = rf->data;
     static int once_printed = 0;
 
-    const int MAX_BYTES_TO_SHOW = 2048;
+    const int MAX_BYTES_TO_SHOW = 128;  /* Reduced for test output - only show first few blocks */
     const int BYTES_PER_PAIR   = 2 * (int)sizeof(uint8_t);   // I + Q
     const int MAX_PAIRS_TO_SHOW = MAX_BYTES_TO_SHOW / BYTES_PER_PAIR;
 
@@ -47,18 +47,18 @@ static int _rf_file_write_uint8(void *private, int16_t *iq_data, int samples)
         int n = (rf->samples < samples) ? rf->samples : samples;
         int i;
 
-        // signed 16-bit -> unsigned 8-bit (Shift nach [0..255], MSB)
+        // signed 16-bit -> unsigned 8-bit (shift to [0..255], MSB)
         for (i = 0; i < n; i++, iq_data += 2) {
             u8[2*i + 0] = (uint8_t)(((int32_t)iq_data[0] - INT16_MIN) >> 8); // I
             u8[2*i + 1] = (uint8_t)(((int32_t)iq_data[1] - INT16_MIN) >> 8); // Q
         }
 
-        // Einmalige Vorschau (max. 2048 Bytes)
+        // One-time preview (max. 128 bytes)
         if (!once_printed) {
             int pairs_to_show   = (n < MAX_PAIRS_TO_SHOW) ? n : MAX_PAIRS_TO_SHOW;
             int bytes_in_preview = pairs_to_show * BYTES_PER_PAIR;
 
-            printf("Schreibe %d Bytes in Datei (uint8, Hex) – Vorschau erster Block (max. %d Bytes):\n",
+            printf("Writing %d bytes to file (uint8, hex) – preview first block (max. %d bytes):\n",
                    bytes_in_preview, MAX_BYTES_TO_SHOW);
 
             for (int j = 0; j < pairs_to_show; ++j) {
@@ -73,7 +73,7 @@ static int _rf_file_write_uint8(void *private, int16_t *iq_data, int samples)
             once_printed = 1;
         }
 
-        // Schreiben: rf->data_size sollte 2*sizeof(uint8_t) sein
+        // Write: rf->data_size should be 2*sizeof(uint8_t)
         fwrite(rf->data, rf->data_size, i, rf->f);
         samples -= i;
     }
@@ -86,32 +86,32 @@ static int _rf_file_write_int8(void *private, int16_t *iq_data, int total_input_
 {
     rf_file_t *rf = private;
     int8_t *i8 = rf->data;
-    int once_printed = 0;                // static? -> Falls die Funktion mehrfach pro Prozesslebensdauer aufgerufen wird,
-    static int s_once_printed = 0;       //      lieber statisch halten:
+    int once_printed = 0;                // static? -> If function is called multiple times per process lifetime,
+    static int s_once_printed = 0;       //      better to keep it static:
     once_printed = s_once_printed;
 
-    const int MAX_BYTES_TO_SHOW = 2048;
+    const int MAX_BYTES_TO_SHOW = 128;  /* Reduced for test output - only show first few blocks */
     const int BYTES_PER_PAIR = 2 * (int)sizeof(int8_t); // I+Q
     const int MAX_PAIRS_TO_SHOW = MAX_BYTES_TO_SHOW / BYTES_PER_PAIR;
 
     int samples = total_input_samples;
 
     while (samples) {
-        int n = rf->samples < samples ? rf->samples : samples;  // #IQ-Paare in diesem Block
+        int n = rf->samples < samples ? rf->samples : samples;  // #IQ pairs in this block
         int i;
 
-        // Konvertieren: 16-bit -> 8-bit (MSB), interleaved I/Q
+        // Convert: 16-bit -> 8-bit (MSB), interleaved I/Q
         for (i = 0; i < n; i++, iq_data += 2) {
             i8[2*i + 0] = (int8_t)(iq_data[0] >> 8);
             i8[2*i + 1] = (int8_t)(iq_data[1] >> 8);
         }
 
-        // Einmalige Vorschau (max. 2048 Bytes)
+        // One-time preview (max. 128 bytes)
         if (!once_printed) {
             int pairs_to_show = n < MAX_PAIRS_TO_SHOW ? n : MAX_PAIRS_TO_SHOW;
             int bytes_in_preview = pairs_to_show * BYTES_PER_PAIR;
 
-            printf("Schreibe %d Bytes in Datei (int8) – Vorschau erster Block (max. %d Bytes):\n",
+            printf("Writing %d bytes to file (int8) – preview first block (max. %d bytes):\n",
                    bytes_in_preview, MAX_BYTES_TO_SHOW);
 
             for (int j = 0; j < pairs_to_show; ++j) {
@@ -141,15 +141,15 @@ static int _rf_file_write_uint16(void *private, int16_t *iq_data, int samples)
     uint16_t *u16 = rf->data;
     static int once_printed = 0;
 
-    const int MAX_BYTES_TO_SHOW = 2048;
+    const int MAX_BYTES_TO_SHOW = 128;  /* Reduced for test output - only show first few blocks */
     const int BYTES_PER_PAIR = 2 * (int)sizeof(uint16_t); // I+Q
     const int MAX_PAIRS_TO_SHOW = MAX_BYTES_TO_SHOW / BYTES_PER_PAIR;
 
     while (samples) {
-        int n = rf->samples < samples ? rf->samples : samples; // #IQ-Paare in diesem Block
+        int n = rf->samples < samples ? rf->samples : samples; // #IQ pairs in this block
         int i;
 
-        // Konvertieren: signed 16-bit -> unsigned 16-bit (Offset zu [0..65535])
+        // Convert: signed 16-bit -> unsigned 16-bit (offset to [0..65535])
         for (i = 0; i < n; i++, iq_data += 2) {
             u16[2*i + 0] = (uint16_t)((int32_t)iq_data[0] - INT16_MIN);
             u16[2*i + 1] = (uint16_t)((int32_t)iq_data[1] - INT16_MIN);
@@ -159,7 +159,7 @@ static int _rf_file_write_uint16(void *private, int16_t *iq_data, int samples)
             int pairs_to_show = n < MAX_PAIRS_TO_SHOW ? n : MAX_PAIRS_TO_SHOW;
             int bytes_in_preview = pairs_to_show * BYTES_PER_PAIR;
 
-            printf("Schreibe %d Bytes in Datei (uint16, Hex) – Vorschau erster Block (max. %d Bytes):\n",
+            printf("Writing %d bytes to file (uint16, hex) – preview first block (max. %d bytes):\n",
                    bytes_in_preview, MAX_BYTES_TO_SHOW);
 
             for (int j = 0; j < pairs_to_show; ++j) {
@@ -187,7 +187,7 @@ static int _rf_file_write_int16(void *private, int16_t *iq_data, int samples)
     rf_file_t *rf = private;
     static int once_printed = 0;
 
-    const int MAX_BYTES_TO_SHOW = 2048;
+    const int MAX_BYTES_TO_SHOW = 128;  /* Reduced for test output - only show first few blocks */
     const int BYTES_PER_PAIR = 2 * (int)sizeof(int16_t); // I+Q
     const int MAX_PAIRS_TO_SHOW = MAX_BYTES_TO_SHOW / BYTES_PER_PAIR;
 
@@ -200,7 +200,7 @@ static int _rf_file_write_int16(void *private, int16_t *iq_data, int samples)
             int pairs_to_show = n < MAX_PAIRS_TO_SHOW ? n : MAX_PAIRS_TO_SHOW;
             int bytes_in_preview = pairs_to_show * BYTES_PER_PAIR;
 
-            printf("Schreibe %d Bytes in Datei (int16, Hex) – Vorschau erster Block (max. %d Bytes):\n",
+            printf("Writing %d bytes to file (int16, hex) – preview first block (max. %d bytes):\n",
                    bytes_in_preview, MAX_BYTES_TO_SHOW);
 
             for (int j = 0; j < pairs_to_show; ++j) {
@@ -215,7 +215,7 @@ static int _rf_file_write_int16(void *private, int16_t *iq_data, int samples)
             once_printed = 1;
         }
 
-        // Direkter Write aus Eingabepuffer
+        // Direct write from input buffer
         fwrite(iq_data, sizeof(int16_t) * 2, n, rf->f);
 
         iq_data   += 2 * n;
@@ -231,7 +231,7 @@ static int _rf_file_write_int32(void *private, int16_t *iq_data, int samples)
     int32_t *i32 = rf->data;
     static int once_printed = 0;
 
-    const int MAX_BYTES_TO_SHOW = 2048;
+    const int MAX_BYTES_TO_SHOW = 128;  /* Reduced for test output - only show first few blocks */
     const int BYTES_PER_PAIR = 2 * (int)sizeof(int32_t); // I+Q
     const int MAX_PAIRS_TO_SHOW = MAX_BYTES_TO_SHOW / BYTES_PER_PAIR;
 
@@ -248,7 +248,7 @@ static int _rf_file_write_int32(void *private, int16_t *iq_data, int samples)
             int pairs_to_show = n < MAX_PAIRS_TO_SHOW ? n : MAX_PAIRS_TO_SHOW;
             int bytes_in_preview = pairs_to_show * BYTES_PER_PAIR;
 
-            printf("Schreibe %d Bytes in Datei (int32, Hex) – Vorschau erster Block (max. %d Bytes):\n",
+            printf("Writing %d bytes to file (int32, hex) – preview first block (max. %d bytes):\n",
                    bytes_in_preview, MAX_BYTES_TO_SHOW);
 
             for (int j = 0; j < pairs_to_show; ++j) {
@@ -276,7 +276,7 @@ static int _rf_file_write_float(void *private, int16_t *iq_data, int samples)
     float *f32 = rf->data;
     static int once_printed = 0;
 
-    const int MAX_BYTES_TO_SHOW = 2048;
+    const int MAX_BYTES_TO_SHOW = 128;  /* Reduced for test output - only show first few blocks */
     const int BYTES_PER_PAIR = 2 * (int)sizeof(float); // I+Q
     const int MAX_PAIRS_TO_SHOW = MAX_BYTES_TO_SHOW / BYTES_PER_PAIR;
     const float scale = 1.0f / 32767.0f;
@@ -294,7 +294,7 @@ static int _rf_file_write_float(void *private, int16_t *iq_data, int samples)
             int pairs_to_show = n < MAX_PAIRS_TO_SHOW ? n : MAX_PAIRS_TO_SHOW;
             int bytes_in_preview = pairs_to_show * BYTES_PER_PAIR;
 
-            printf("Schreibe %d Bytes in Datei (float, ±1.0) – Vorschau erster Block (max. %d Bytes):\n",
+            printf("Writing %d bytes to file (float, ±1.0) – preview first block (max. %d bytes):\n",
                    bytes_in_preview, MAX_BYTES_TO_SHOW);
 
             for (int j = 0; j < pairs_to_show; ++j) {
@@ -320,40 +320,48 @@ static int _rf_file_write_float(void *private, int16_t *iq_data, int samples)
 static int _rf_file_write_unmod_uint8(void *private, int16_t *iq_data, int bytes)
 {
     rf_file_t *rf = private;
-    const uint8_t *p = (const uint8_t*)iq_data; // unmodulierte Roh-Bytes
+    const uint8_t *p = (const uint8_t*)iq_data; // unmodulated raw bytes
     size_t n;
+    static int once_printed = 0;
 
-    printf("Schreibe %d unvermodulierte Roh-Bytes (Hex, ohne 0x):\n", bytes);
-
-    size_t count = 0;          // Anzahl bereits gedruckter Bytes (für Zeilenumbrüche)
-    size_t k = 0;
+    const int MAX_BYTES_TO_SHOW = 128;  /* Reduced for test output - only show first few blocks */
     size_t total = (bytes < 0) ? 0 : (size_t)bytes;
+    size_t bytes_to_show = (total < MAX_BYTES_TO_SHOW) ? total : MAX_BYTES_TO_SHOW;
 
-    while (k < total) {
-        // Treffer: Sequenz A9 59 ab Position k?
-        if (k + 1 < total && p[k] == 0xA9 && p[k + 1] == 0x59) {
-            // A9 (Amber)
-            printf(COLOR_AMBER "%02X" COLOR_RESET " ", p[k]);
+    if (!once_printed) {
+        printf("Writing %zu unmodulated raw bytes (hex, without 0x) – preview first block (max. %d bytes):\n", 
+               total, MAX_BYTES_TO_SHOW);
+
+        size_t count = 0;          // Number of bytes already printed (for line breaks)
+        size_t k = 0;
+
+        while (k < bytes_to_show) {
+            // Match: sequence A9 59 at position k?
+            if (k + 1 < bytes_to_show && p[k] == 0xA9 && p[k + 1] == 0x59) {
+                // A9 (Amber)
+                printf(COLOR_AMBER "%02X" COLOR_RESET " ", p[k]);
+                count++;
+                if ((count % 16) == 0) printf("\n");
+
+                // 59 (Blue)
+                printf(COLOR_BLUE "%02X" COLOR_RESET " ", p[k + 1]);
+                count++;
+                if ((count % 16) == 0) printf("\n");
+
+                k += 2;
+                continue;
+            }
+
+            // Normal bytes without highlighting
+            printf("%02X ", p[k]);
             count++;
             if ((count % 16) == 0) printf("\n");
-
-            // 59 (Blau)
-            printf(COLOR_BLUE "%02X" COLOR_RESET " ", p[k + 1]);
-            count++;
-            if ((count % 16) == 0) printf("\n");
-
-            k += 2;
-            continue;
+            k++;
         }
 
-        // Normale Bytes ohne Hervorhebung
-        printf("%02X ", p[k]);
-        count++;
-        if ((count % 16) == 0) printf("\n");
-        k++;
+        if ((count % 16) != 0) printf("\n"); // Final line
+        once_printed = 1;
     }
-
-    if ((count % 16) != 0) printf("\n"); // Abschlusszeile
 
     n = fwrite(p, 1, total, rf->f);
     return (n == total) ? 0 : -1;
@@ -381,10 +389,10 @@ static int _rf_udp_write_unmod_uint8(void *private, int16_t *iq_data, int bytes)
     size_t total = (size_t)bytes;
     size_t off = 0;
 
-    // (Einmalige) farbige Vorschau ohne "0x", A9 59 highlighten
+    // (One-time) colored preview without "0x", highlight A9 59
     if (!u->preview_done) {
         size_t show = total < UDP_PREVIEW_BYTES ? total : UDP_PREVIEW_BYTES;
-        printf("UDP: Sende %zu unvermodulierte Roh-Bytes (Hex, ohne 0x):\n", show);
+        printf("UDP: Sending %zu unmodulated raw bytes (hex, without 0x):\n", show);
 
         size_t count = 0;
         for (size_t k = 0; k < show; ) {
@@ -401,7 +409,7 @@ static int _rf_udp_write_unmod_uint8(void *private, int16_t *iq_data, int bytes)
         u->preview_done = 1;
     }
 
-    // Chunking in UDP-Pakete
+    // Chunking into UDP packets
     while (off < total) {
         size_t chunk = total - off;
         if (chunk > u->payload) chunk = u->payload;
@@ -418,7 +426,7 @@ static int _rf_udp_write_unmod_uint8(void *private, int16_t *iq_data, int bytes)
 }
 
 
-// Hilfsparser für "udp://host:port", "host:port" oder "[ipv6]:port"
+// Helper parser for "udp://host:port", "host:port" or "[ipv6]:port"
 static int parse_udp_target(const char *spec_in, char *host, size_t host_sz, char *port, size_t port_sz)
 {
     if (!spec_in || !host || !port) return -1;
@@ -441,7 +449,7 @@ static int parse_udp_target(const char *spec_in, char *host, size_t host_sz, cha
         port[port_sz - 1] = '\0';
         return 0;
     } else {
-        // host:port (letzter ':' trennt, damit "a:b:c:5000" geht)
+        // host:port (last ':' separates, so "a:b:c:5000" works)
         const char *colon = strrchr(s, ':');
         if (!colon || colon == s || *(colon + 1) == '\0') return -1;
         size_t hlen = (size_t)(colon - s);
@@ -457,21 +465,21 @@ static int parse_udp_target(const char *spec_in, char *host, size_t host_sz, cha
 
 int rf_file_open(rf_t *s, const char *filename, int type)
 {
-    // --- Spezialfall: UDP-Sink ------------------------------------------------
+    // --- Special case: UDP sink ------------------------------------------------
     if (type == RF_UNMOD_UDP) {
         if (!filename) {
-            fprintf(stderr, "RF_UNMOD_UDP: Ziel fehlt (erwartet z.B. udp://127.0.0.1:5000)\n");
+            fprintf(stderr, "RF_UNMOD_UDP: Target missing (expected e.g. udp://127.0.0.1:5000)\n");
             return -1;
         }
         char host[256], port[32];
         if (parse_udp_target(filename, host, sizeof(host), port, sizeof(port)) != 0) {
-            fprintf(stderr, "RF_UNMOD_UDP: Ziel-String ungueltig: '%s'\n", filename);
+            fprintf(stderr, "RF_UNMOD_UDP: Target string invalid: '%s'\n", filename);
             return -1;
         }
 
         void *udp_priv = NULL;
         if (rf_udp_open(&udp_priv, host, port, 1400) != 0) {
-            fprintf(stderr, "RF_UNMOD_UDP: Konnte UDP %s:%s nicht oeffnen.\n", host, port);
+            fprintf(stderr, "RF_UNMOD_UDP: Could not open UDP %s:%s.\n", host, port);
             return -1;
         }
 
@@ -481,7 +489,7 @@ int rf_file_open(rf_t *s, const char *filename, int type)
         return 0;
     }
 
-    // --- Dateisink für alle anderen Typen ------------------------------------
+    // --- File sink for all other types ------------------------------------
     rf_file_t *rf = calloc(1, sizeof(rf_file_t));
     if (!rf) {
         perror("calloc");
@@ -504,7 +512,7 @@ int rf_file_open(rf_t *s, const char *filename, int type)
         }
     }
 
-    // Datentyp-Grundgröße (pro Sample-Wert, ohne komplex)
+    // Data type base size (per sample value, without complex)
     switch (type)
     {
     case RF_UINT8:        rf->data_size = sizeof(uint8_t);  break;
@@ -520,13 +528,13 @@ int rf_file_open(rf_t *s, const char *filename, int type)
         return -1;
     }
 
-    // Nur für komplexe IQ-Formate verdoppeln (I+Q). NICHT für unmodulierte Rohbytes.
-    if (rf->type != RF_UNMOD_UINT8 /* && rf->type != RF_UNMOD_UDP (nicht im Dateipfad) */)
+    // Only double for complex IQ formats (I+Q). NOT for unmodulated raw bytes.
+    if (rf->type != RF_UNMOD_UINT8 /* && rf->type != RF_UNMOD_UDP (not in file path) */)
         rf->data_size *= 2;
 
     rf->samples = 1024;
 
-    // Buffer nur für Typen, die nicht direkt aus Eingabe schreiben
+    // Buffer only for types that don't write directly from input
     if (rf->type != RF_INT16) {
         rf->data = malloc(rf->data_size * rf->samples);
         if (!rf->data) {
@@ -536,7 +544,7 @@ int rf_file_open(rf_t *s, const char *filename, int type)
         }
     }
 
-    // Callback registrieren
+    // Register callback
     s->private = rf;
     s->close   = _rf_file_close;
 
