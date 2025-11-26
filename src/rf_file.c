@@ -385,9 +385,11 @@ static int _rf_udp_write_unmod_uint8(void *private, int16_t *iq_data, int bytes)
     rf_udp_t *u = (rf_udp_t*)private;
     if (!u || u->sock < 0 || bytes <= 0) return -1;
 
-    const uint8_t *p = (const uint8_t*)iq_data;   // unmodulierte Roh-Bytes
+    const uint8_t *p = (const uint8_t*)iq_data;   // unmodulated raw bytes
     size_t total = (size_t)bytes;
     size_t off = 0;
+
+    const size_t UDP_PREVIEW_BYTES = 128;  /* Reduced for test output - only show first few blocks */
 
     // (One-time) colored preview without "0x", highlight A9 59
     if (!u->preview_done) {
