@@ -1,3 +1,7 @@
+This is a fork of the original DSR Encoder by Philip Heron <phil@sanslogic.co.uk>
+It is extended with a raw stream (no 4-PSK Modulation) and the capabillity to write this raw stream via a local UDP Port.
+
+
 ﻿
 -= dsrtx - Digitale Satelliten Radio (DSR) transmitter =-
 

@@ -14,7 +14,9 @@
 /*                                                                       */
 /* You should have received a copy of the GNU General Public License     */
 /* along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
+#pragma once
+#include <stdint.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,6 +27,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 #ifndef _RF_H
 #define _RF_H
@@ -45,11 +48,6 @@
 #define COLOR_RESET "\x1b[0m"
 
 
-#ifndef UDP_PREVIEW_BYTES
-#define UDP_PREVIEW_BYTES 2048
-#endif
-
-
 /* Callback prototypes */
 typedef int (*rf_write_t)(void *private, int16_t *iq_data, int samples);
 typedef int (*rf_close_t)(void *private);
@@ -64,12 +62,27 @@ typedef struct {
 	
 } rf_t;
 
+typedef struct {
+    int      sock;
+    size_t   payload;
+    int      preview_done;
+
+    /* Pacing */
+     /* --- NEU: Pacing --- */
+    unsigned long long bitrate_bps;  /* 0 => Pacing aus */
+    double   tokens_bytes;           /* Token-Bucket in Bytes */
+    struct timespec last;            /* letzte Auffüllzeit */
+} rf_udp_t;
+
+
 extern double rf_scale(rf_t *s);
 extern int rf_write(rf_t *s, int16_t *iq_data, int samples);
 extern int rf_close(rf_t *s);
-int rf_udp_open(void **out_private, const char *host, const char *port, size_t payload_bytes);
-int rf_udp_close(void *private);
 
+int rf_udp_open(void **out_private, const char *host, const char *port, size_t payload_bytes);
+void rf_udp_set_bitrate(void *priv, uint64_t bps);
+int rf_udp_send(void *priv, const uint8_t *data, size_t len);
+int rf_udp_close(void *priv);
 
 typedef struct {
 	
@@ -86,12 +99,6 @@ typedef struct {
 	
 } rf_qpsk_t;
 
-
-typedef struct rf_udp_s {
-    int                 sock;              // UDP Socket (connected)
-    size_t              payload;           // max. UDP-Payload per send()
-    int                 preview_done;      // single time Debug-Priview
-} rf_udp_t;
 
 extern void rf_qpsk_free(rf_qpsk_t *s);
 extern int rf_qpsk_init(rf_qpsk_t *s, int interpolation, double level);
