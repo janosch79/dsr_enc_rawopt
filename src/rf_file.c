@@ -14,6 +14,11 @@
 /*                                                                       */
 /* You should have received a copy of the GNU General Public License     */
 /* along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+/*                                                                       */
+/* This code has been modified by janosch79.                             */
+/* This code is provided "as is" without warranty of any kind, express  */
+/* or implied. The user assumes full responsibility for any use of      */
+/* this code.                                                            */
 
 #include <stdio.h>
 #include <stdint.h>
@@ -389,7 +394,7 @@ static int _rf_udp_write_unmod_uint8(void *private, int16_t *iq_data, int bytes)
     size_t total = (size_t)bytes;
     size_t off = 0;
 
-    const size_t UDP_PREVIEW_BYTES = 128;  /* Reduced for test output - only show first few blocks */
+    const size_t UDP_PREVIEW_BYTES = 154;  /* Max 2 frames (154 bytes) */
 
     // (One-time) colored preview without "0x", highlight A9 59
     if (!u->preview_done) {
@@ -418,7 +423,8 @@ static int _rf_udp_write_unmod_uint8(void *private, int16_t *iq_data, int bytes)
 
         ssize_t sent = send(u->sock, p + off, chunk, 0);
         if (sent < 0) {
-            fprintf(stderr, "UDP send() failed: %s\n", strerror(errno));
+            // Error message suppressed to avoid spam when UDP receiver is not available
+            // fprintf(stderr, "UDP send() failed: %s\n", strerror(errno));
             return -1;
         }
         off += (size_t)sent;

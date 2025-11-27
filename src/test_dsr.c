@@ -5,6 +5,11 @@
 /*                                                                       */
 /* This file should only be compiled when DSR_ENABLE_TEST is defined.   */
 /* The Makefile sets DSR_ENABLE_TEST when building test_dsr.             */
+/*                                                                       */
+/* This code has been modified by janosch79.                             */
+/* This code is provided "as is" without warranty of any kind, express  */
+/* or implied. The user assumes full responsibility for any use of      */
+/* this code.                                                            */
 
 #include <stdio.h>
 #include <stdint.h>

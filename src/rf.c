@@ -14,6 +14,11 @@
 /*                                                                       */
 /* You should have received a copy of the GNU General Public License     */
 /* along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+/*                                                                       */
+/* This code has been modified by janosch79.                             */
+/* This code is provided "as is" without warranty of any kind, express  */
+/* or implied. The user assumes full responsibility for any use of      */
+/* this code.                                                            */
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -153,7 +158,7 @@ int rf_qpsk_modulate(rf_qpsk_t *s, int16_t *dst, const uint8_t *src, int bits)
 static int once = 0;
 if (!once) {
     int nbytes = bits / 8;
-    int dump = nbytes < 256 ? nbytes : 256; // show first up to 128 bytes
+    int dump = nbytes < 512 ? nbytes : 512; // show first up to 128 bytes
     fprintf(stderr, "MOD SRC (first %d bytes):", dump);
     for (int i = 0; i < dump; i++) {
         fprintf(stderr, " %02X", src[i]);

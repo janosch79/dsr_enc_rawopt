@@ -1,7 +1,29 @@
-// udpsink.c
+/* dsr - Digitale Satelliten Radio (DSR) encoder                         */
+/*=======================================================================*/
+/* Copyright 2021 Philip Heron <phil@sanslogic.co.uk>                    */
+/*                                                                       */
+/* This program is free software: you can redistribute it and/or modify  */
+/* it under the terms of the GNU General Public License as published by  */
+/* the Free Software Foundation, either version 3 of the License, or     */
+/* (at your option) any later version.                                   */
+/*                                                                       */
+/* This program is distributed in the hope that it will be useful,       */
+/* but WITHOUT ANY WARRANTY; without even the implied warranty of        */
+/* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         */
+/* GNU General Public License for more details.                          */
+/*                                                                       */
+/* You should have received a copy of the GNU General Public License     */
+/* along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+/*                                                                       */
+/* This code has been modified by janosch79.                             */
+/* This code is provided "as is" without warranty of any kind, express  */
+/* or implied. The user assumes full responsibility for any use of      */
+/* this code.                                                            */
+
+// udpsink.c - UDP network sink for the dsr - Digitale Satelliten Radio (DSR) encoder
 
 #include "rf.h"
-
+#include <fcntl.h>
 
 static inline void add_ns(struct timespec *t, uint64_t ns){
     t->tv_nsec += (long)(ns % 1000000000ULL);
@@ -9,6 +31,7 @@ static inline void add_ns(struct timespec *t, uint64_t ns){
     if(t->tv_nsec >= 1000000000L){ t->tv_nsec -= 1000000000L; t->tv_sec += 1; }
 }
 
+//Open UDP Socket
 int rf_udp_open(void **out_private, const char *host, const char *port, size_t payload_bytes)
 {
     if (!out_private || !host || !port) return -1;
@@ -38,9 +61,15 @@ int rf_udp_open(void **out_private, const char *host, const char *port, size_t p
         return -1;
     }
 
-    /* großer Sendepuffer */
-    int sndbuf = 1<<20; /* 1 MiB */
+    /* sendbuffer defination - größer für WSL Performance */
+    int sndbuf = 8<<20; /* 8 MiB - größerer Buffer für WSL */
     (void)setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf));
+    
+    /* Socket auf non-blocking setzen um Buffer-Überlauf zu vermeiden */
+    int flags = fcntl(sock, F_GETFL, 0);
+    if (flags >= 0) {
+        fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+    }
 
     rf_udp_t *u = (rf_udp_t*)calloc(1, sizeof(*u));
     if (!u) { close(sock); return -1; }
@@ -49,7 +78,7 @@ int rf_udp_open(void **out_private, const char *host, const char *port, size_t p
     u->payload      = (payload_bytes && payload_bytes < 9000) ? payload_bytes : 1400;
     u->preview_done = 0;
 
-    /* Pacing default: aus */
+    /* Pacing default: off */
     u->bitrate_bps  = 0;
     u->tokens_bytes = 0.0;
     clock_gettime(CLOCK_MONOTONIC, &u->last);
@@ -62,7 +91,7 @@ void rf_udp_set_bitrate(void *priv, uint64_t bps)
 {
     rf_udp_t *u = (rf_udp_t*)priv;
     if (!u) return;
-    u->bitrate_bps = bps;      /* 0 = Pacing aus */
+    u->bitrate_bps = bps;      /* 0 = Pacing off */
     u->tokens_bytes = 0.0;
     clock_gettime(CLOCK_MONOTONIC, &u->last);
 }
@@ -73,13 +102,14 @@ static inline int64_t ts_diff_ns(const struct timespec *a, const struct timespec
            + ((int64_t)a->tv_nsec - (int64_t)b->tv_nsec);
 }
 
+/*Send UDP Packages*/
 int rf_udp_send(void *priv, const uint8_t *data, size_t len)
 {
     rf_udp_t *u = (rf_udp_t*)priv;
     if (!u || !data || len == 0) return -1;
 
     size_t off = 0;
-    /* kleine Obergrenze, damit Tokens nicht unendlich „anlaufen“ */
+    
     const double TOKENS_CAP = (double)u->payload * 6.0;
 
     while (off < len) {
@@ -87,19 +117,16 @@ int rf_udp_send(void *priv, const uint8_t *data, size_t len)
         if (chunk > (len - off)) chunk = (len - off);
 
         if (u->bitrate_bps > 0) {
-            /* Tokens auffüllen je nach verstrichener Zeit */
             struct timespec now;
             clock_gettime(CLOCK_MONOTONIC, &now);
             int64_t dtns = ts_diff_ns(&now, &u->last);
             if (dtns > 0) {
-                /* Bytes = (bps * ns) / (8 * 1e9) */
                 double add = ((double)u->bitrate_bps * (double)dtns) / 8000000000.0;
                 u->tokens_bytes += add;
                 if (u->tokens_bytes > TOKENS_CAP) u->tokens_bytes = TOKENS_CAP;
                 u->last = now;
             }
 
-            /* ggf. warten, bis genug Tokens für „chunk“ vorhanden sind */
             if (u->tokens_bytes < (double)chunk) {
                 double deficit = (double)chunk - u->tokens_bytes;
                 uint64_t need_ns = (uint64_t)((deficit * 8000000000.0) / (double)u->bitrate_bps);
@@ -109,7 +136,6 @@ int rf_udp_send(void *priv, const uint8_t *data, size_t len)
                     ts.tv_nsec = (long)(need_ns % 1000000000ULL);
                     nanosleep(&ts, NULL);
 
-                    /* nach dem Schlaf neu auffüllen */
                     clock_gettime(CLOCK_MONOTONIC, &now);
                     dtns = ts_diff_ns(&now, &u->last);
                     if (dtns > 0) {

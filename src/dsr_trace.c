@@ -1,6 +1,11 @@
 /* dsr - Trace/Debug functionality for DSR encoder                        */
 /*=======================================================================*/
 /* Provides trace output to help understand the encoding process         */
+/*                                                                       */
+/* This code has been modified by janosch79.                             */
+/* This code is provided "as is" without warranty of any kind, express  */
+/* or implied. The user assumes full responsibility for any use of      */
+/* this code.                                                            */
 
 #include <stdio.h>
 #include <stdarg.h>

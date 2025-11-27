@@ -2,6 +2,11 @@
 /*=======================================================================*/
 /* This program generates fixed random test data for all 32 channels     */
 /* and outputs it in all available modulation formats for 100ms.        */
+/*                                                                       */
+/* This code has been modified by janosch79.                             */
+/* This code is provided "as is" without warranty of any kind, express  */
+/* or implied. The user assumes full responsibility for any use of      */
+/* this code.                                                            */
 
 #include <stdio.h>
 #include <stdlib.h>
