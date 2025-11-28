@@ -421,10 +421,11 @@ static int _rf_udp_write_unmod_uint8(void *private, int16_t *iq_data, int bytes)
         size_t chunk = total - off;
         if (chunk > u->payload) chunk = u->payload;
 
-        ssize_t sent = send(u->sock, p + off, chunk, 0);
+        ssize_t sent = sendto(u->sock, p + off, chunk, 0,
+                             (struct sockaddr *)&u->addr, u->addrlen);
         if (sent < 0) {
             // Error message suppressed to avoid spam when UDP receiver is not available
-            // fprintf(stderr, "UDP send() failed: %s\n", strerror(errno));
+            // fprintf(stderr, "UDP sendto() failed: %s\n", strerror(errno));
             return -1;
         }
         off += (size_t)sent;
