@@ -67,6 +67,10 @@ typedef struct {
     size_t   payload;
     int      preview_done;
 
+    /* Target address for sendto() */
+    struct sockaddr_storage addr;
+    socklen_t addrlen;
+
     /* Pacing */
      /* --- NEU: Pacing --- */
     unsigned long long bitrate_bps;  /* 0 => Pacing aus */

@@ -49,16 +49,28 @@ int rf_udp_open(void **out_private, const char *host, const char *port, size_t p
     }
 
     int sock = -1;
+    struct sockaddr_storage target_addr;
+    socklen_t target_addrlen = 0;
+    
     for (rp = res; rp != NULL; rp = rp->ai_next) {
         sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
         if (sock < 0) continue;
-        if (connect(sock, rp->ai_addr, rp->ai_addrlen) == 0) break;
-        close(sock); sock = -1;
+        
+        /* Speichere Zieladresse für sendto() */
+        memcpy(&target_addr, rp->ai_addr, rp->ai_addrlen);
+        target_addrlen = rp->ai_addrlen;
+        break;
     }
     freeaddrinfo(res);
     if (sock < 0) {
-        fprintf(stderr, "UDP connect(%s:%s) fehlgeschlagen\n", host, port);
+        fprintf(stderr, "UDP socket(%s:%s) fehlgeschlagen\n", host, port);
         return -1;
+    }
+
+    /* Broadcast aktivieren für mehrere Clients */
+    int broadcast = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) < 0) {
+        fprintf(stderr, "Warnung: SO_BROADCAST konnte nicht aktiviert werden: %s\n", strerror(errno));
     }
 
     /* sendbuffer defination - größer für WSL Performance */
@@ -77,6 +89,10 @@ int rf_udp_open(void **out_private, const char *host, const char *port, size_t p
     u->sock         = sock;
     u->payload      = (payload_bytes && payload_bytes < 9000) ? payload_bytes : 1400;
     u->preview_done = 0;
+    
+    /* Zieladresse speichern */
+    memcpy(&u->addr, &target_addr, target_addrlen);
+    u->addrlen = target_addrlen;
 
     /* Pacing default: off */
     u->bitrate_bps  = 0;
@@ -148,9 +164,10 @@ int rf_udp_send(void *priv, const uint8_t *data, size_t len)
             }
         }
 
-        ssize_t s = send(u->sock, data + off, chunk, 0);
+        ssize_t s = sendto(u->sock, data + off, chunk, 0, 
+                          (struct sockaddr *)&u->addr, u->addrlen);
         if (s < 0) {
-            // fprintf(stderr, "UDP send failed: %s\n", strerror(errno));
+            // fprintf(stderr, "UDP sendto failed: %s\n", strerror(errno));
             return -1;
         }
         off += (size_t)s;
