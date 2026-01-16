@@ -18,7 +18,7 @@
 #ifndef _SRC_FFMPEG_H
 #define _SRC_FFMPEG_H
 
-extern int src_ffmpeg_open(src_t *s, const char *input_url);
+extern int src_ffmpeg_open(src_t *s, const char *input_url, double level);
 
 extern void src_ffmpeg_init(void);
 extern void src_ffmpeg_deinit(void);

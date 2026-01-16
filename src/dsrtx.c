@@ -143,7 +143,7 @@ static void *_open_src(conf_t conf, int i)
 			return(NULL);
 		}
 		
-		r = src_ffmpeg_open(src, v);
+		r = src_ffmpeg_open(src, v, conf_double(conf, "channel", i, "level", 1.0));
 		if(r != 0)
 		{
 			fprintf(stderr, "Warning: Failed to open '%s'\n", v);

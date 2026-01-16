@@ -42,6 +42,9 @@ typedef struct {
 	int16_t *audio;
 	int audio_len;
 	
+	/* Audio level */
+	double level;
+	
 } src_ffmpeg_t;
 
 static void _print_ffmpeg_error(int r)
@@ -96,6 +99,17 @@ static int _src_ffmpeg_read(src_ffmpeg_t *src, int16_t *audio[2], int audio_step
 	
 	av_frame_unref(src->frame);
 	
+	/* Apply level scaling if level is not 1.0 */
+	if(src->level != 1.0 && r > 0)
+	{
+		int i;
+		int samples = r * 2; /* Stereo samples */
+		for(i = 0; i < samples; i++)
+		{
+			src->audio[i] = (int16_t)(src->audio[i] * src->level);
+		}
+	}
+	
 	audio[0] = src->audio + 0;
 	audio[1] = src->audio + 1;
 	audio_step[0] = audio_step[1] = 2;
@@ -115,7 +129,7 @@ static int _src_ffmpeg_close(src_ffmpeg_t *src)
 	return(0);
 }
 
-int src_ffmpeg_open(src_t *s, const char *input_url)
+int src_ffmpeg_open(src_t *s, const char *input_url, double level)
 {
 	src_ffmpeg_t *src;
 	const AVCodec *codec;
@@ -272,6 +286,9 @@ int src_ffmpeg_open(src_t *s, const char *input_url)
 	}
 	
 	src->audio = av_malloc(sizeof(int16_t) * 2 * src->audio_len);
+	
+	/* Store the audio level */
+	src->level = level;
 	
 	/* Register the callback functions */
 	s->private = src;
